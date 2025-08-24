@@ -1,11 +1,11 @@
 # Wastearr
 
-A Python CLI tool that analyzes your Sonarr and Radarr collections to identify content with poor value-to-storage ratios. Connects directly to Sonarr/Radarr APIs to fetch ratings and file sizes, then calculates "waste scores" for movies and TV shows.
+A CLI tool that analyzes your Sonarr and Radarr collections to identify content with poor value-to-storage ratios. Connects directly to Sonarr/Radarr APIs to fetch ratings and file sizes, then calculates "waste scores" for movies and TV shows.
 
 ## Features
 
 - **Direct API integration**: Connects to Sonarr and Radarr APIs for accurate metadata
-- **Smart scoring**: Content-aware algorithm that accounts for different expectations between movies and TV shows  
+- **Smart scoring**: Content-aware algorithm that accounts for different expectations between movies and TV shows
 - **Downloaded content only**: Shows only TV shows and movies with downloaded files by default
 - **Intelligent caching**: Automatic caching with 72-hour expiration for faster subsequent runs
 - **Flexible filtering**: Filter by waste score, file size, ratings, or show top offenders
@@ -20,29 +20,28 @@ export SONARR_API_KEY="your_sonarr_api_key"
 export RADARR_API_KEY="your_radarr_api_key"
 
 # Analyze both collections
-./wastearr
+cargo run
 
 # Analyze only TV series (Sonarr)
-./wastearr sonarr
+cargo run -- sonarr
 
-# Analyze only movies (Radarr)  
-./wastearr radarr
+# Analyze only movies (Radarr)
+cargo run -- radarr
 
 # Show worst 20 items
-./wastearr --top-waste 20
+cargo run -- --top-waste 20
 
 # Find large, low-rated content
-./wastearr --min-size 5GB --ratings 6.0
+cargo run -- --min-size 5GB --ratings 6.0
 ```
 
 ## Requirements
 
-- Python 3.8+
-- [uv](https://docs.astral.sh/uv/) package manager
+- Rust 1.85.0+ (for edition 2024 features)
 - Running Sonarr and/or Radarr instances
 - API keys for Sonarr and Radarr
 
-Dependencies are automatically managed via uv's inline script feature.
+Dependencies are managed via Cargo and specified in `Cargo.toml`.
 
 ## Configuration
 
@@ -55,10 +54,12 @@ Wastearr supports multiple configuration methods with the following priority ord
 ### Configuration Options
 
 **Required:**
+
 - `SONARR_API_KEY` - Your Sonarr API key
 - `RADARR_API_KEY` - Your Radarr API key
 
 **Optional:**
+
 - `SONARR_URL` - Sonarr URL (default: `http://localhost:8989`)
 - `RADARR_URL` - Radarr URL (default: `http://localhost:7878`)
 
@@ -67,12 +68,12 @@ Wastearr supports multiple configuration methods with the following priority ord
 ```bash
 export SONARR_API_KEY="your_sonarr_api_key"
 export RADARR_API_KEY="your_radarr_api_key"
-./wastearr
+cargo run
 ```
 
 ### Method 2: .env File
 
-Create a `.env` file in the same directory as the script:
+Create a `.env` file in the project directory:
 
 ```bash
 # Copy .env.sample to .env and edit
