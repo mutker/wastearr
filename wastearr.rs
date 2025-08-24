@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
-use clap::{Arg, ArgAction, Command, ValueHint};
-use comfy_table::{Table, modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL};
+use clap::{Arg, ArgAction, Command};
+use comfy_table::{modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, Table};
 use dirs::{cache_dir, config_dir};
 use regex::Regex;
 use reqwest::blocking::Client;
@@ -21,26 +21,17 @@ struct Item {
     size_bytes: u64,
     rating: String,
     item_type: String, // 'tv' or 'movie'
-    identifier: Option<i32>,
     waste_score: i32,
 }
 
 impl Item {
-    fn new(
-        name: String,
-        year: i32,
-        size_bytes: u64,
-        rating: String,
-        item_type: String,
-        identifier: Option<i32>,
-    ) -> Self {
+    fn new(name: String, year: i32, size_bytes: u64, rating: String, item_type: String) -> Self {
         Item {
             name,
             year,
             size_bytes,
             rating,
             item_type,
-            identifier,
             waste_score: 0,
         }
     }
@@ -75,17 +66,6 @@ struct CacheData {
 }
 
 impl CacheData {
-    fn new() -> Self {
-        CacheData {
-            timestamp: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs_f64(),
-            sonarr_ratings: HashMap::new(),
-            radarr_ratings: HashMap::new(),
-        }
-    }
-
     fn is_expired(&self) -> bool {
         let current_time = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -283,14 +263,7 @@ fn scan_sonarr_data(
 
         // Only include series with files by default
         if size_bytes > 0 {
-            items.push(Item::new(
-                title,
-                year,
-                size_bytes,
-                rating,
-                "tv".to_string(),
-                Some(series_id),
-            ));
+            items.push(Item::new(title, year, size_bytes, rating, "tv".to_string()));
         }
     }
 
@@ -386,7 +359,6 @@ fn scan_radarr_data(
                 size_bytes,
                 rating,
                 "movie".to_string(),
-                Some(movie_id),
             ));
         }
     }
@@ -731,14 +703,6 @@ fn mode(values: &[f64]) -> f64 {
         .unwrap_or(0.0);
 
     most_frequent
-}
-
-fn truncate_text(text: &str, max_length: usize) -> String {
-    if text.len() <= max_length {
-        text.to_string()
-    } else {
-        format!("{}…", &text[..max_length.saturating_sub(1)])
-    }
 }
 
 fn format_unified_table(items: &[Item], show_type_column: bool) -> String {
