@@ -1,0 +1,219 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  quality-gates:
+    name: Quality gates
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        run: |
+          if command -v rustup &> /dev/null; then
+            rustup update stable
+            rustup component add rustfmt clippy
+          else
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --component rustfmt,clippy
+            echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          fi
+
+      - name: Cache cargo registry
+        uses: https://code.forgejo.org/actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Run tests
+        run: cargo test --all-features --verbose
+
+      - name: Security audit
+        run: |
+          cargo install cargo-audit
+          cargo audit
+
+      - name: Build verification
+        run: cargo build --release
+
+  build-matrix:
+    name: Build release binaries
+    needs: quality-gates
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            use-upx: true
+
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check if tag-triggered build
+        id: check-tag
+        run: |
+          if git describe --exact-match --tags HEAD 2>/dev/null; then
+            echo "is_tag=true" >> $GITHUB_OUTPUT
+            echo "This is a tag build: $(git describe --exact-match --tags HEAD)"
+          else
+            echo "is_tag=false" >> $GITHUB_OUTPUT
+            echo "Not a tag build, skipping release binary builds"
+            exit 0
+          fi
+
+      - name: Setup Rust toolchain
+        run: |
+          if command -v rustup &> /dev/null; then
+            rustup update stable
+            rustup target add ${{ matrix.target }}
+          else
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+            echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+            rustup target add ${{ matrix.target }}
+          fi
+
+      - name: Build release binary
+        run: |
+          # Configure release profile for maximum optimization
+          cargo build --release --target ${{ matrix.target }} --verbose
+
+      - name: Strip debug symbols from binary
+        run: strip target/${{ matrix.target }}/release/wastearr
+
+      - name: Compress binary with UPX
+        if: matrix.use-upx == true
+        run: |
+          # Install UPX
+          wget -O upx.tar.xz https://github.com/upx/upx/releases/download/v4.2.1/upx-4.2.1-amd64_linux.tar.xz
+          tar -xf upx.tar.xz
+
+          # Compress binary using local UPX
+          ./upx-4.2.1-amd64_linux/upx --best target/${{ matrix.target }}/release/wastearr
+
+      - name: Test binary functionality
+        run: ./target/${{ matrix.target }}/release/wastearr --version || echo "Binary verification failed"
+
+      - name: Package release artifacts
+        run: |
+          cd target/${{ matrix.target }}/release/
+
+          # Create directory for archive contents
+          ARCHIVE_DIR="wastearr-${{ github.ref_name }}-${{ matrix.target }}"
+          mkdir -p "$ARCHIVE_DIR"
+
+          # Copy files to archive directory
+          cp wastearr "$ARCHIVE_DIR/"
+          cp ../../../README.md "$ARCHIVE_DIR/" 2>/dev/null || echo "README.md not found"
+          cp ../../../LICENSE "$ARCHIVE_DIR/" 2>/dev/null || echo "LICENSE not found"
+
+          # Create tar.gz archive and checksum
+          tar -czf "${ARCHIVE_DIR}.tar.gz" "$ARCHIVE_DIR"
+          sha256sum "${ARCHIVE_DIR}.tar.gz" > "${ARCHIVE_DIR}.tar.gz.sha256"
+
+      - name: Upload packaged artifacts
+        uses: https://code.forgejo.org/actions/upload-artifact@v3
+        with:
+          name: releases-${{ matrix.target }}
+          path: |
+            target/${{ matrix.target }}/release/wastearr-${{ github.ref_name }}-${{ matrix.target }}.*
+
+  create-release:
+    name: Create release
+    needs: build-matrix
+    runs-on: self-hosted
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: https://code.forgejo.org/actions/download-artifact@v3
+        with:
+          path: artifacts
+
+      - name: Display structure of downloaded files
+        run: ls -la artifacts/
+
+      - name: Check if tag-triggered release
+        id: check-tag
+        run: |
+          # Check if we have release artifacts (which are only built for tags)
+          if [ -d artifacts/releases-x86_64-unknown-linux-gnu ]; then
+            echo "is_tag=true" >> $GITHUB_OUTPUT
+            echo "Found release artifacts, proceeding with release"
+
+            # Get the actual tag name from git
+            TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.1.0")
+            echo "tag_name=$TAG" >> $GITHUB_OUTPUT
+            echo "Detected tag: $TAG"
+          else
+            echo "is_tag=false" >> $GITHUB_OUTPUT
+            echo "No release artifacts found, skipping release creation"
+            exit 0
+          fi
+
+      - name: Create release via API
+        env:
+          TAG_NAME: ${{ steps.check-tag.outputs.tag_name }}
+          RELEASE_TOKEN: ${{ github.token }}
+        run: |
+          # Create release via Codeberg API
+          RELEASE_BODY="Automated release build from tag ${TAG_NAME}
+
+          ## What's included
+          - Linux x86_64 binary (compressed with UPX)
+          - SHA256 checksum file
+
+          ## Installation
+          \`\`\`bash
+          wget https://codeberg.org/mutker/wastearr/releases/download/${TAG_NAME}/wastearr-*-x86_64-unknown-linux-gnu.tar.gz
+          tar -xzf wastearr-*-x86_64-unknown-linux-gnu.tar.gz
+          chmod +x wastearr-*/wastearr
+          \`\`\`"
+
+          # Create the release
+          curl -X POST \
+            -H "Authorization: token ${RELEASE_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"tag_name\": \"${TAG_NAME}\",
+              \"name\": \"Release ${TAG_NAME}\",
+              \"body\": $(echo "$RELEASE_BODY" | jq -Rs .),
+              \"draft\": false,
+              \"prerelease\": false
+            }" \
+            "https://codeberg.org/api/v1/repos/mutker/wastearr/releases"
+
+          # Upload release assets
+          for file in artifacts/releases-x86_64-unknown-linux-gnu/*; do
+            if [ -f "$file" ]; then
+              filename=$(basename "$file")
+              echo "Uploading $filename..."
+              curl -X POST \
+                -H "Authorization: token ${RELEASE_TOKEN}" \
+                -H "Content-Type: application/octet-stream" \
+                --data-binary @"$file" \
+                "https://codeberg.org/api/v1/repos/mutker/wastearr/releases/tags/${TAG_NAME}/assets?name=${filename}"
+            fi
+          done

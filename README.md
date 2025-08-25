@@ -1,6 +1,6 @@
 # Wastearr
 
-A CLI tool that analyzes your Sonarr and Radarr collections to identify content with poor value-to-storage ratios. Connects directly to Sonarr/Radarr APIs to fetch ratings and file sizes, then calculates "waste scores" for movies and TV shows.
+A CLI tool that analyzes your Sonarr and Radarr collections to identify content with poor ratings-to-storage ratios. Connects directly to Sonarr/Radarr APIs to fetch ratings and file sizes, then calculates "waste scores" for movies and TV shows.
 
 ## Features
 
@@ -63,7 +63,17 @@ Wastearr supports multiple configuration methods with the following priority ord
 - `SONARR_URL` - Sonarr URL (default: `http://localhost:8989`)
 - `RADARR_URL` - Radarr URL (default: `http://localhost:7878`)
 
-### Method 1: Environment Variables
+### Method 1: Config File
+
+Copy env.sample to `~/.config/wastearr/config`:
+
+```bash
+mkdir -p ~/.config/wastearr
+cp env.sample ~/.config/wastearr/config
+# Edit conf with your API keys and URLs
+```
+
+### Method 2: Environment Variables
 
 ```bash
 export SONARR_API_KEY="your_sonarr_api_key"
@@ -71,28 +81,14 @@ export RADARR_API_KEY="your_radarr_api_key"
 cargo run
 ```
 
-### Method 2: .env File
+### Method 3: .env File
 
 Create a `.env` file in the project directory:
 
 ```bash
-# Copy .env.sample to .env and edit
-cp .env.sample .env
-# Edit .env with your API keys
-```
-
-### Method 3: Config File
-
-Create a config file at `~/.config/wastearr/conf`:
-
-```bash
-mkdir -p ~/.config/wastearr
-cat > ~/.config/wastearr/conf << EOF
-SONARR_API_KEY=your_sonarr_api_key
-RADARR_API_KEY=your_radarr_api_key
-SONARR_URL=http://localhost:8989
-RADARR_URL=http://localhost:7878
-EOF
+# Copy env.sample to .env and edit
+cp env.sample .env
+# Edit .env with your API keys and URLs
 ```
 
 ### Getting API Keys

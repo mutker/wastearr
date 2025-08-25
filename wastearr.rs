@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use clap::{Arg, ArgAction, Command};
-use comfy_table::{modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, Table};
+use comfy_table::{Table, modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL};
 use dirs::{cache_dir, config_dir};
 use regex::Regex;
 use reqwest::blocking::Client;
@@ -216,7 +216,7 @@ fn validate_api_connectivity(config: &Config, scan_types: &[String]) -> Result<(
                     service_name.to_uppercase()
                 )),
                 |key| match client
-                    .get(&format!("{}/api/v3/system/status", url))
+                    .get(format!("{}/api/v3/system/status", url))
                     .header("X-Api-Key", key)
                     .timeout(std::time::Duration::from_secs(5))
                     .send()
@@ -555,9 +555,9 @@ fn print_results(
     min_size_bytes: Option<u64>,
 ) {
     items.retain(|item| {
-        args.waste_score.map_or(true, |min| item.waste_score >= min)
-            && min_size_bytes.map_or(true, |min| item.size_bytes >= min)
-            && args.ratings.map_or(true, |max| {
+        args.waste_score.is_none_or(|min| item.waste_score >= min)
+            && min_size_bytes.is_none_or(|min| item.size_bytes >= min)
+            && args.ratings.is_none_or(|max| {
                 item.rating == "N/A" || item.rating.parse::<f64>().unwrap_or(0.0) <= max
             })
     });

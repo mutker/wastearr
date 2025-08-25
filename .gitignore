@@ -1,5 +1,7 @@
 .env
 .claude
 .issues
+.serena
+debug
 target
 CLAUDE.md
