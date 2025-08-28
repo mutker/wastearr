@@ -85,10 +85,18 @@ fn load_file_vars(file_path: &Path) -> HashMap<String, String> {
 fn get_config_value(key: &str) -> Option<String> {
     env::var(key)
         .ok()
+        .or_else(|| {
+            config_dir().and_then(|dir| {
+                load_file_vars(&dir.join("wastearr/config"))
+                    .get(key)
+                    .cloned()
+            })
+        })
         .or_else(|| load_file_vars(&PathBuf::from(".env")).get(key).cloned())
         .or_else(|| {
-            config_dir()
-                .and_then(|dir| load_file_vars(&dir.join("wastearr/conf")).get(key).cloned())
+            load_file_vars(&PathBuf::from("/etc/wastearr/config"))
+                .get(key)
+                .cloned()
         })
 }
 

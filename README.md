@@ -12,6 +12,23 @@ A CLI tool that analyzes your Sonarr and Radarr collections to identify content 
 - **Terminal-friendly**: Responsive table formatting that adapts to your terminal width
 - **Robust error handling**: Clear error messages and connectivity validation
 
+## Installation
+
+### From AUR (Arch Linux)
+
+```bash
+yay -Sy wastearr-git
+```
+
+### From Source
+
+```bash
+git clone https://codeberg.org/mutker/wastearr.git
+cd wastearr
+cargo build --release
+# Binary will be at target/release/wastearr
+```
+
 ## Quick Start
 
 ```bash
@@ -63,7 +80,15 @@ Wastearr supports multiple configuration methods with the following priority ord
 - `SONARR_URL` - Sonarr URL (default: `http://localhost:8989`)
 - `RADARR_URL` - Radarr URL (default: `http://localhost:7878`)
 
-### Method 1: Config File
+### Method 1: Environment Variables
+
+```bash
+export SONARR_API_KEY="your_sonarr_api_key"
+export RADARR_API_KEY="your_radarr_api_key"
+cargo run
+```
+
+### Method 2: Config File
 
 Copy env.sample to `~/.config/wastearr/config`:
 
@@ -71,14 +96,6 @@ Copy env.sample to `~/.config/wastearr/config`:
 mkdir -p ~/.config/wastearr
 cp env.sample ~/.config/wastearr/config
 # Edit conf with your API keys and URLs
-```
-
-### Method 2: Environment Variables
-
-```bash
-export SONARR_API_KEY="your_sonarr_api_key"
-export RADARR_API_KEY="your_radarr_api_key"
-cargo run
 ```
 
 ### Method 3: .env File
@@ -89,6 +106,16 @@ Create a `.env` file in the project directory:
 # Copy env.sample to .env and edit
 cp env.sample .env
 # Edit .env with your API keys and URLs
+```
+
+### Method 4: Global Config File
+
+Create a system-wide config file at `/etc/wastearr/config`:
+
+```bash
+sudo mkdir -p /etc/wastearr
+sudo cp env.sample /etc/wastearr/config
+# Edit /etc/wastearr/config with your API keys and URLs
 ```
 
 ### Getting API Keys
